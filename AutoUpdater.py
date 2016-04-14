@@ -38,24 +38,35 @@ def calcMD5(fileName):
 
 
 def getLocalFilesMD5():
-    fileList = {}
-    directory = localDirectory
-    if directory[-1] == '\\' or directory[-1] == '/':
-        directory = directory[:-1]
-    realDirectory = os.path.split(directory)[1]
+    localMD5Filename = localPath + versionFile
 
-    def findFile(arg,dirname,files):
-        for file in files:
-            file_path=os.path.join(dirname,file)
-            if os.path.isfile(file_path):
-                md5 = calcMD5(file_path)
-                size=os.path.getsize(file_path)
-                file_path = file_path.replace(directory,realDirectory)
-                file_path = file_path.replace("\\", "/")
-                fileList[file_path] = (md5,size)
-                #print ("find file:%s,md5:%s,size:%d" %(file_path,md5,size))
-    os.path.walk(directory,findFile,())
-    return fileList
+    #if exist,read from file
+    if os.path.exists(localFileFolder):
+        f = open(filename,'r')
+        content = f.read()
+        fileList = json.loads(content)
+        f.close()
+        return fileList
+    #if not,scan whole path
+    else:
+        fileList = {}
+        directory = localDirectory
+        if directory[-1] == '\\' or directory[-1] == '/':
+            directory = directory[:-1]
+        realDirectory = os.path.split(directory)[1]
+
+        def findFile(arg,dirname,files):
+            for file in files:
+                file_path=os.path.join(dirname,file)
+                if os.path.isfile(file_path):
+                    md5 = calcMD5(file_path)
+                    size=os.path.getsize(file_path)
+                    file_path = file_path.replace(directory,realDirectory)
+                    file_path = file_path.replace("\\", "/")
+                    fileList[file_path] = (md5,size)
+                    #print ("find file:%s,md5:%s,size:%d" %(file_path,md5,size))
+        os.path.walk(directory,findFile,())
+        return fileList
 
 
 def getServerFilesMD5():
@@ -71,7 +82,7 @@ def getServerFilesMD5():
         exit(-1)
 
 
-def downloadProcedure(diffFiles,totalDownloadBytes,serverVersionStr,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent,startGameButton):
+def downloadProcedure(diffFiles,totalDownloadBytes,serverVersionStr,serverFiles,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent,startGameButton):
     currentDownloadBytes = 0
 
     def SingleFileDownloadProgressCallback(a,b,c,currentDownloadBytes,totalDownloadBytes,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent):
@@ -100,9 +111,14 @@ def downloadProcedure(diffFiles,totalDownloadBytes,serverVersionStr,downloadTota
     #done
     startGameButton["state"]=NORMAL
 
-    file = open(localPath + versionFile,"w")
-    file.write(serverVersionStr)
-    file.close()
+    #save to file
+    file1 = open(localPath + versionFile,"w")
+    file1.write(serverVersionStr)
+    file1.close()
+
+    file2 = open(localPath + md5File,"w")
+    file2.write(json.dumps(serverFiles))
+    file2.close()
 
 
 def matchVersion(localVersionStrLabel,serverVersionStrLabel,startGameButton,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent):
@@ -137,8 +153,6 @@ def matchVersion(localVersionStrLabel,serverVersionStrLabel,startGameButton,down
         startGameButton["state"]=NORMAL
         return
 
-    import time
-    d1 = time.time()
     #calc diff files
     localFiles = getLocalFilesMD5()
     serverFiles = getServerFilesMD5()
@@ -155,13 +169,9 @@ def matchVersion(localVersionStrLabel,serverVersionStrLabel,startGameButton,down
                 totalDownloadBytes += v[1]
     progressTotal["maximum"] = totalDownloadBytes
 
-    d2 = time.time()
-
-    print d2 - d1
-
     #start a thread to download
     threading.Thread(target =
-            lambda:downloadProcedure(diffFiles,totalDownloadBytes,serverVersionStr,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent,startGameButton)).start()
+            lambda:downloadProcedure(diffFiles,totalDownloadBytes,serverVersionStr,serverFiles,downloadTotalTips,progressTotal,downloadCurrentTips,progressCurrent,startGameButton)).start()
 
 
 
